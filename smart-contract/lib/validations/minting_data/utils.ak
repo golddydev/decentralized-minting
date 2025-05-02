@@ -2,17 +2,15 @@ use aiken/bytearray
 use aiken/math
 use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/credential.{
-  Address, ScriptCredential, VerificationKeyCredential,
-}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use common/cip68.{prefix_000, prefix_100, prefix_222}
 use common/handle.{parse_handle_name}
-use common/hashes.{ScriptHash, VerificationKeyHash}
+use common/hashes.{ScriptHash}
 use common/utils.{parse_bool_from_int}
 use decentralized_minting/handle_price.{HandlePriceInfo, get_handle_price}
 use decentralized_minting/orders.{OrderDatum}
-use decentralized_minting/settings_v1.{min_minter_fee, min_treasury_fee}
+use decentralized_minting/settings_v1.{min_treasury_fee}
 use decentralized_minting/sub_handle.{
   get_root_handle_settings, get_sub_handle_price,
 }
@@ -51,7 +49,7 @@ pub fn all_orders_are_satisfied(
           expect datum: OrderDatum = datum
           let OrderDatum {
             requested_handle,
-            destination,
+            destination_address,
             is_legacy,
             is_virtual,
             ..
@@ -101,7 +99,7 @@ pub fn all_orders_are_satisfied(
               handle_price,
               is_virtual_bool,
               pz_script_address,
-              destination.address,
+              destination_address,
             )
 
           let new_mint_value =
@@ -252,7 +250,7 @@ fn check_ref_and_user_outputs(
   handle_price: Int,
   is_virtual: Bool,
   pz_script_address: Address,
-  order_destination_address: Address,
+  destination_address: Address,
 ) -> List<Output> {
   // make ref asset name and user asset name from requested_handle
   let virtual_asset_name = bytearray.concat(prefix_000, requested_handle)
@@ -308,7 +306,7 @@ fn check_ref_and_user_outputs(
       expect ref_output_reference_script == None
 
       // check user output
-      expect user_output_address == order_destination_address
+      expect user_output_address == destination_address
       // user output value = min_lovelace + minted handle (user)
       let user_output_value_has_handle =
         value.quantity_of(
@@ -364,21 +362,6 @@ pub fn calculate_treasury_fee_and_minter_fee(
       total_handles_price * treasury_fee_percentage / 100,
       min_treasury_fee,
     )
-  let minter_fee =
-    math.max(
-      total_handles_price * ( 100 - treasury_fee_percentage ) / 100,
-      min_minter_fee,
-    )
+  let minter_fee = math.max(total_handles_price - treasury_fee, 0)
   (treasury_fee, minter_fee)
-}
-
-pub fn is_minter_address_match_with_verification_key_hash(
-  minter_output_address: Address,
-  allowed_minter: VerificationKeyHash,
-) -> Bool {
-  let Address { payment_credential, .. } = minter_output_address
-  when payment_credential is {
-    VerificationKeyCredential(vkh) -> vkh == allowed_minter
-    _ -> False
-  }
 }

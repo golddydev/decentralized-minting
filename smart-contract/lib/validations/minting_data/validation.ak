@@ -5,7 +5,7 @@ use aiken/transaction.{
 }
 use aiken/transaction/value.{PolicyId}
 use common/hashes.{VerificationKeyHash}
-use decentralized_minting/handle_price.{find_handle_price_info}
+use decentralized_minting/handle_price.{resolve_handle_price_info}
 use decentralized_minting/minting_data.{MintingData, resolve_minting_data}
 use decentralized_minting/settings.{Settings, find_settings}
 use decentralized_minting/settings_v1.{
@@ -14,7 +14,6 @@ use decentralized_minting/settings_v1.{
 use validations/minting_data/types.{Proof}
 use validations/minting_data/utils.{
   all_orders_are_satisfied, calculate_treasury_fee_and_minter_fee,
-  is_minter_address_match_with_verification_key_hash,
 }
 
 // Validation:
@@ -74,13 +73,21 @@ pub fn can_mint_handles(
   let Input { output: minting_data_input, .. } = spending_input
   let MintingData { mpt_root_hash } = resolve_minting_data(minting_data_input)
 
-  // find handle price info using valid handle price info asset
-  let handle_price_info =
-    find_handle_price_info(reference_inputs, valid_handle_price_asset)
-
   // parse outputs
-  expect [minting_data_output, treasury_output, minter_output, ..rest_outputs] =
-    outputs
+  expect [
+    minting_data_output,
+    handle_price_info_output,
+    treasury_output,
+    minter_output,
+    ..rest_outputs
+  ] = outputs
+
+  // resolve handle price info from handle price info output
+  let handle_price_info =
+    resolve_handle_price_info(
+      handle_price_info_output,
+      valid_handle_price_asset,
+    )
 
   // expect proofs are not empty
   expect list.length(proofs) > 0
@@ -145,26 +152,17 @@ pub fn can_mint_handles(
 
   // check minter output
   let Output {
-    address: minter_output_address,
     value: minter_output_value,
     datum: minter_output_datum,
     reference_script: minter_output_reference_script,
+    ..
   } = minter_output
-  expect
-    is_minter_address_match_with_verification_key_hash(
-      minter_output_address,
-      allowed_minter,
-    )
   expect minter_output_datum == InlineDatum(Void)
   expect value.lovelace_of(minter_output_value) >= minter_fee
   expect minter_output_reference_script == None
 
   // check minted handles
-  expect
-    value.merge(
-      value.from_minted_value(mint),
-      value.negate(expected_mint_value),
-    ) == value.zero()
+  expect value.from_minted_value(mint) == expected_mint_value
 
   True
 }

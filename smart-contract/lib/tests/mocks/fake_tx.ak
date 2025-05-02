@@ -9,7 +9,7 @@ use aiken/transaction/value.{AssetName, PolicyId, Value}
 use common/hashes.{ScriptHash, VerificationKeyHash}
 use decentralized_minting/handle_price.{HandlePriceInfo}
 use decentralized_minting/minting_data.{MintingData}
-use decentralized_minting/orders.{Destination, OrderDatum}
+use decentralized_minting/orders.{OrderDatum}
 use decentralized_minting/settings.{Settings}
 use decentralized_minting/settings_v1.{SettingsV1}
 use sundae/multisig.{Signature}
@@ -43,9 +43,9 @@ pub fn make_order_input(
     OrderDatum {
       owner: Signature(owner_verification_key_hash),
       requested_handle,
-      destination: Destination {
-        address: credential.from_verification_key(owner_verification_key_hash),
-      },
+      destination_address: credential.from_verification_key(
+        owner_verification_key_hash,
+      ),
       is_legacy: 0,
       is_virtual: 0,
     }
@@ -135,29 +135,25 @@ pub fn make_minting_data_input(
   }
 }
 
-pub fn make_handle_price_info_reference_input(
-  valid_handle_price_asset: (PolicyId, AssetName),
-) -> Input {
-  let (policy_id, asset_name) = valid_handle_price_asset
-  let handle_price_info: HandlePriceInfo =
-    HandlePriceInfo {
-      current_data: current_handle_price_data(),
-      prev_data: prev_handle_price_data(),
-      updated_at: 0,
-    }
+pub fn make_handle_price_info() -> HandlePriceInfo {
+  HandlePriceInfo {
+    current_data: current_handle_price_data(),
+    prev_data: prev_handle_price_data(),
+    updated_at: 0,
+  }
+}
 
-  Input {
-    output_reference: OutputReference {
-      transaction_id: TransactionId { hash: #"aaac" },
-      output_index: 0,
-    },
-    output: Output {
-      address: credential.from_verification_key(#"abab"),
-      value: value.zero()
-        |> value.add(policy_id, asset_name, 1),
-      datum: InlineDatum(handle_price_info),
-      reference_script: None,
-    },
+pub fn make_handle_price_info_output(
+  valid_handle_price_asset: (PolicyId, AssetName),
+) -> Output {
+  let (policy_id, asset_name) = valid_handle_price_asset
+
+  Output {
+    address: credential.from_verification_key(#"abab"),
+    value: value.zero()
+      |> value.add(policy_id, asset_name, 1),
+    datum: InlineDatum(make_handle_price_info()),
+    reference_script: None,
   }
 }
 
