@@ -5,7 +5,7 @@ use validations/minting_data/types.{Proof}
 use validations/minting_data/validation.{can_mint_handles, can_update_mpt}
 
 type MintingDataRedeemer {
-  MintHandles(List<Proof>, Int)
+  MintHandles(List<Proof>, Int, Int)
   // Update MPT
   UpdateMPT
 }
@@ -40,13 +40,14 @@ validator(
     expect Spend(spending_output_reference) = purpose
 
     when redeemer is {
-      MintHandles(proofs, minter_index) ->
+      MintHandles(proofs, minter_index, main_sub_handle_settings_index) ->
         can_mint_handles(
           transaction,
           spending_output_reference,
           proofs,
           legacy_policy_id,
           minter_index,
+          main_sub_handle_settings_index,
         )
       UpdateMPT -> can_update_mpt(transaction, admin_verification_key_hash)
     }

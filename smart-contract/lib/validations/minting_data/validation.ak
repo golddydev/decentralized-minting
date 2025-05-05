@@ -11,6 +11,9 @@ use decentralized_minting/settings.{Settings, find_settings}
 use decentralized_minting/settings_v1.{
   SettingsV1, get_allowed_minter_and_valid_handle_price_asset,
 }
+use decentralized_minting/sub_handle.{
+  get_dumb_main_sub_handle_settings, get_main_sub_handle_minter_fees,
+}
 use validations/minting_data/types.{Proof}
 use validations/minting_data/utils.{
   all_orders_are_satisfied, calculate_treasury_fee_and_minter_fee,
@@ -31,6 +34,7 @@ pub fn can_mint_handles(
   proofs: List<Proof>,
   legacy_policy_id: PolicyId,
   minter_index: Int,
+  main_sub_handle_settings_index: Int,
 ) -> Bool {
   trace @"Start Minting Data"
   let Transaction {
@@ -89,6 +93,17 @@ pub fn can_mint_handles(
       valid_handle_price_asset,
     )
 
+  // get main sub handle settings
+  let dumb_main_sub_handle_settings =
+    get_dumb_main_sub_handle_settings(
+      reference_inputs,
+      main_sub_handle_settings_index,
+    )
+
+  // get main sub handle minter fees
+  let (nft_sub_handle_minter_fee, virtual_sub_handle_minter_fee) =
+    get_main_sub_handle_minter_fees(dumb_main_sub_handle_settings)
+
   // expect proofs are not empty
   expect list.length(proofs) > 0
 
@@ -100,6 +115,7 @@ pub fn can_mint_handles(
     new_root,
     expected_mint_value,
     total_handles_price,
+    total_sub_handle_minter_fee,
   <-
     all_orders_are_satisfied(
       order_script_hash,
@@ -110,9 +126,12 @@ pub fn can_mint_handles(
       legacy_policy_id,
       pz_script_address,
       handle_price_info,
+      nft_sub_handle_minter_fee,
+      virtual_sub_handle_minter_fee,
       proofs,
       root,
       value.zero(),
+      0,
       0,
     )
 
@@ -137,6 +156,7 @@ pub fn can_mint_handles(
       total_handles_price,
       treasury_fee_percentage,
     )
+  let total_minter_fee = minter_fee + total_sub_handle_minter_fee
 
   // check treasury output
   let Output {
@@ -158,7 +178,7 @@ pub fn can_mint_handles(
     ..
   } = minter_output
   expect minter_output_datum == InlineDatum(Void)
-  expect value.lovelace_of(minter_output_value) >= minter_fee
+  expect value.lovelace_of(minter_output_value) >= total_minter_fee
   expect minter_output_reference_script == None
 
   // check minted handles

@@ -1,8 +1,31 @@
 use aiken/bytearray
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
+use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{PolicyId}
+use common/address.{convert_address_from_bytearray}
 use common/cip68.{prefix_001}
+
+const main_sub_handle_settings_policy_id =
+  #"f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a"
+
+// sh_settings
+// hold main sub handle settings
+//
+const main_sub_handle_settings_asset_name = #"000de14073685f73657474696e6773"
+
+// struct MainSubHandleSettings { 
+//     valid_contracts: []ByteArray
+//     admin_creds: []ByteArray
+//     virtual_price: Int
+//     base_price: Int
+//     buy_down_prices: [][]Int
+//     payment_address: ByteArray
+//     expiry_duration: Int
+//     renewal_window: Int
+// }
+pub type DumbMainSubHandleSettings =
+  (Data, Data, Data, Data, Data, Data, Data, Data)
 
 // struct SubHandleSettings {
 //     public_minting_enabled: Int
@@ -11,7 +34,7 @@ use common/cip68.{prefix_001}
 //     default_styles: Data
 //     save_original_address: Int
 // }
-type SubHandleSettings =
+pub type SubHandleSettings =
   (Int, Int, List<(Int, Int)>, Data, Int)
 
 // struct OwnerSettings {
@@ -24,16 +47,55 @@ type SubHandleSettings =
 //     migrate_sig_required: Int
 //     payment_address: ByteArray
 // }
-type OwnerSettings =
+pub type DumbOwnerSettings =
+  (Data, Data, Data, Data, Data, Data, Data, Data)
+
+pub type OwnerSettings =
   (SubHandleSettings, SubHandleSettings, Int, Int, Int, Data, Int, ByteArray)
 
-pub fn get_root_handle_settings(
+pub fn get_dumb_main_sub_handle_settings(
+  reference_inputs: List<Input>,
+  main_sub_handle_settings_index: Int,
+) -> DumbMainSubHandleSettings {
+  expect Some(main_sub_handle_settings_input) =
+    list.at(reference_inputs, main_sub_handle_settings_index)
+  let Input { output: main_sub_handle_settings_output, .. } =
+    main_sub_handle_settings_input
+  let Output { value: output_value, datum, .. } =
+    main_sub_handle_settings_output
+
+  // check input has main sub handle settings asset
+  expect
+    value.quantity_of(
+      output_value,
+      main_sub_handle_settings_policy_id,
+      main_sub_handle_settings_asset_name,
+    ) == 1
+  expect InlineDatum(inline_datum) = datum
+  expect dumb_main_sub_handle_settings: DumbMainSubHandleSettings = inline_datum
+  dumb_main_sub_handle_settings
+}
+
+// This functions returns
+// base minter_fee when mint sub handles
+// (nft_sub_handle_minter_fee, virtual_sub_handle_minter_fee)
+pub fn get_main_sub_handle_minter_fees(
+  dumb_main_sub_handle_settings: DumbMainSubHandleSettings,
+) -> (Int, Int) {
+  let (_, _, dumb_virtual_minter_fee, dumb_nft_minter_fee, _, _, _, _) =
+    dumb_main_sub_handle_settings
+  expect nft_sub_handle_minter_fee: Int = dumb_nft_minter_fee
+  expect virtual_sub_handle_minter_fee: Int = dumb_virtual_minter_fee
+  (nft_sub_handle_minter_fee, virtual_sub_handle_minter_fee)
+}
+
+pub fn get_dumb_root_handle_settings(
   reference_inputs: List<Input>,
   root_handle_settings_index: Int,
   root_handle_name: ByteArray,
   new_policy_id: PolicyId,
   legacy_policy_id: PolicyId,
-) -> OwnerSettings {
+) -> DumbOwnerSettings {
   expect Some(reference_input) =
     list.at(reference_inputs, root_handle_settings_index)
 
@@ -51,31 +113,54 @@ pub fn get_root_handle_settings(
 
   // parse datum
   expect InlineDatum(inline_datum) = reference_input.output.datum
-  expect owner_settings: OwnerSettings = inline_datum
-  owner_settings
+  expect dumb_owner_settings: DumbOwnerSettings = inline_datum
+  dumb_owner_settings
+}
+
+// get sub handle settings from owner settings
+// and get payment_address (converted from hex bytes)
+//
+pub fn get_sub_handle_settings_and_payment_address(
+  dumb_root_handle_settings: DumbOwnerSettings,
+  is_virtual: Bool,
+) -> (SubHandleSettings, Address) {
+  let (
+    dumb_nft_sub_handle_settings,
+    dumb_virtual_sub_handle_settings,
+    _,
+    _,
+    _,
+    _,
+    _,
+    dumb_hex_payment_address,
+  ) = dumb_root_handle_settings
+  expect hex_payment_address: ByteArray = dumb_hex_payment_address
+
+  if is_virtual {
+    expect virtual_sub_handle_settings: SubHandleSettings =
+      dumb_virtual_sub_handle_settings
+    (
+      virtual_sub_handle_settings,
+      convert_address_from_bytearray(hex_payment_address),
+    )
+  } else {
+    expect nft_sub_handle_settings: SubHandleSettings =
+      dumb_nft_sub_handle_settings
+    (
+      nft_sub_handle_settings,
+      convert_address_from_bytearray(hex_payment_address),
+    )
+  }
 }
 
 //
-// this function gets sub handle price
-// from root handle owner settings
-// when it is virtual or nft
-// sub handle name is without root handle name
+// this function returns sub handle price
+// from tier_pricing
 //
 pub fn get_sub_handle_price(
-  root_handle_settings: OwnerSettings,
+  sub_handle_settings: SubHandleSettings,
   sub_handle_length: Int,
-  is_virtual: Bool,
 ) -> Int {
-  let (nft_sub_handle_settings, virtual_sub_handle_settings, _, _, _, _, _, _) =
-    root_handle_settings
-
-  let sub_handle_settings =
-    if is_virtual {
-      virtual_sub_handle_settings
-    } else {
-      nft_sub_handle_settings
-    }
-
   let (_, _, tier_pricing, _, _) = sub_handle_settings
   get_sub_handle_price_from_tier_pricing(tier_pricing, sub_handle_length)
 }
