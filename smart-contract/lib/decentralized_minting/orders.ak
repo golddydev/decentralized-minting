@@ -1,6 +1,6 @@
 use aiken/transaction/credential.{Address}
 
-// OrderDatum now consists of owner (to close order), 
+// OrderDatum now consists of owner_key_hash (to close order), 
 // requested_handle (handle name - any string)
 // and destination_address (for now it is address)
 // is_legacy (handle is legacy or not)
@@ -11,8 +11,9 @@ use aiken/transaction/credential.{Address}
 // Using this information, validator can calculate handle's price
 
 pub type OrderDatum {
-  // the key hash of the wallet that placed the order that is used for cancelling the order
-  owner: Data,
+  // the verification key hash of the wallet that 
+  // placed the order that is used for cancelling the order
+  owner_key_hash: ByteArray,
   // without asset name label
   requested_handle: ByteArray,
   // the payment credential in the address that the Handle should be sent to
@@ -21,10 +22,4 @@ pub type OrderDatum {
   is_legacy: Int,
   // whether order for virtual sub handle or not (1: virtual, 0: not)
   is_virtual: Int,
-}
-
-pub type OrderRedeemer {
-  ExecuteAsNew
-  ExecuteAsLegacy
-  Cancel
 }

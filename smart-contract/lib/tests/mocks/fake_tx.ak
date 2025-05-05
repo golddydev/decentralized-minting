@@ -12,7 +12,6 @@ use decentralized_minting/minting_data.{MintingData}
 use decentralized_minting/orders.{OrderDatum}
 use decentralized_minting/settings.{Settings}
 use decentralized_minting/settings_v1.{SettingsV1}
-use sundae/multisig.{Signature}
 use tests/mocks/fake_constants.{
   allowed_minter_0, allowed_minter_1, current_handle_price_data,
   min_order_lovelace, mint_governor, mint_version, minting_data_asset_name,
@@ -41,7 +40,7 @@ pub fn make_order_input(
 ) -> Input {
   let order: OrderDatum =
     OrderDatum {
-      owner: Signature(owner_verification_key_hash),
+      owner_key_hash: owner_verification_key_hash,
       requested_handle,
       destination_address: credential.from_verification_key(
         owner_verification_key_hash,
