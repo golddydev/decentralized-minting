@@ -59,16 +59,24 @@ const makeMintingDataUplcProgramParameterDatum = (
 };
 
 const makeOrdersUplcProgramParameter = (
+  new_policy_id: string,
   legacy_policy_id: string
 ): UplcValue[] => {
-  return [makeUplcDataValue(makeByteArrayData(legacy_policy_id))];
+  return [
+    makeUplcDataValue(makeByteArrayData(new_policy_id)),
+    makeUplcDataValue(makeByteArrayData(legacy_policy_id)),
+  ];
 };
 
 const makeOrdersUplcProgramParameterDatum = (
+  new_policy_id: string,
   legacy_policy_id: string
 ): InlineTxOutputDatum => {
   return makeInlineTxOutputDatum(
-    makeListData([makeByteArrayData(legacy_policy_id)])
+    makeListData([
+      makeByteArrayData(new_policy_id),
+      makeByteArrayData(legacy_policy_id),
+    ])
   );
 };
 

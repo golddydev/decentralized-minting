@@ -11,13 +11,13 @@ import { Err, Ok, Result } from "ts-res";
 
 import {
   fetchHandlePriceInfoData,
+  fetchMainSubHandleSettings,
   fetchMintingData,
   fetchSettings,
 } from "../configs/index.js";
 import {
   buildMintingData,
   buildMintingDataMintHandlesRedeemer,
-  Handle,
   HandlePriceInfo,
   makeVoidData,
   MintingData,
@@ -27,8 +27,9 @@ import {
   SettingsV1,
 } from "../contracts/index.js";
 import { getBlockfrostV0Client, getNetwork } from "../helpers/index.js";
-import { calculateTreasuryFeeAndMinterFee } from "../utils/index.js";
+import { calculateTreasuryFeeAndMinterFee, parseHandleUtf8Name } from "../utils/index.js";
 import { DeployedScripts, fetchAllDeployedScripts } from "./deploy.js";
+import { Handle } from "./type.js";
 
 /**
  * @interface
@@ -71,6 +72,12 @@ const prepareLegacyMintTransaction = async (
     return Err(new Error("Byron Address not supported"));
   const blockfrostV0Client = getBlockfrostV0Client(blockfrostApiKey);
 
+  // check every handle is legacy
+  const areAllLegacyHandles = handles.every((handle) => handle.isLegacy);
+  if (!areAllLegacyHandles) {
+    return Err(new Error("Must mint only legacy handles"));
+  }
+
   // fetch deployed scripts
   const fetchedResult = await fetchAllDeployedScripts(blockfrostV0Client);
   if (!fetchedResult.ok)
@@ -94,7 +101,7 @@ const prepareLegacyMintTransaction = async (
 
   // NOTE:
   // we assume valid handle price asset is
-  // "price@handle_settings" (koralab's)
+  // "kora@handle_prices" (koralab's handle price info)
   const handlePriceInfoDataResult = await fetchHandlePriceInfoData(
     HANDLE_PRICE_INFO_HANDLE_NAME
   );
@@ -108,6 +115,18 @@ const prepareLegacyMintTransaction = async (
   const { handlePriceInfo, handlePriceInfoAssetTxInput } =
     handlePriceInfoDataResult.data;
 
+  // fetch main sub handle settings
+  const mainSubHandleSettingsResult = await fetchMainSubHandleSettings();
+  if (!mainSubHandleSettingsResult.ok) {
+    return Err(
+      new Error(
+        `Failed to fetch main sub handle settings: ${mainSubHandleSettingsResult.error}`
+      )
+    );
+  }
+  const { mainSubHandleSettings, mainSubHandleSettingsAssetTxInput } =
+    mainSubHandleSettingsResult.data;
+
   // check if current db trie hash is same as minting data root hash
   if (
     mintingData.mpt_root_hash.toLowerCase() !=
@@ -116,8 +135,15 @@ const prepareLegacyMintTransaction = async (
     return Err(new Error("ERROR: Local DB and On Chain Root Hash mismatch"));
   }
 
-  // calculate total handle price
-  const totalHandlePrice = handles.reduce((acc, cur) => acc + cur.price, 0n);
+  // calculate treasury fee and minter fee
+  const [totalHandlePrice, totalNftSubHandleFee, totalVirtualSubHandleFee] = handles.reduce((acc, cur) => {
+    const { isSubHandle, rootHandleName } = parseHandleUtf8Name(cur.utf8Name);
+    if (isSubHandle) {
+      const mainSubHandleSettings = mainSubHandleSettings.find(
+        (settings) => settings.root_handle_name == rootHandleName
+      );
+    }
+  }, 0n);
   const { treasuryFee, minterFee } = calculateTreasuryFeeAndMinterFee(
     totalHandlePrice,
     treasury_fee_percentage

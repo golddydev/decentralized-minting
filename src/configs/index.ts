@@ -14,15 +14,18 @@ import { Err, Ok, Result } from "ts-res";
 
 import {
   LEGACY_POLICY_ID,
+  MAIN_SUB_HANDLE_SETTINGS_HANDLE_NAME,
   MINTING_DATA_HANDLE_NAME,
   SETTINGS_HANDLE_NAME,
 } from "../constants/index.js";
 import {
   decodeHandlePriceInfoDatum,
+  decodeMainSubHandleSettings,
   decodeMintingDataDatum,
   decodeSettingsDatum,
   decodeSettingsV1Data,
   HandlePriceInfo,
+  MainSubHandleSettings,
   MintingData,
   Settings,
   SettingsV1,
@@ -131,6 +134,67 @@ const fetchMintingData = async (): Promise<
   });
 };
 
+const fetchMainSubHandleSettings = async (): Promise<
+  Result<
+    {
+      mainSubHandleSettings: MainSubHandleSettings;
+      mainSubHandleSettingsAssetTxInput: TxInput;
+    },
+    string
+  >
+> => {
+  const [
+    mainSubHandleSettingsHandle,
+    mainSubHandleSettingsUtxo,
+    mainSubHandleSettingsHandleDatum,
+  ] = await Promise.all([
+    fetchApi(`handles/${MAIN_SUB_HANDLE_SETTINGS_HANDLE_NAME}`).then((res) =>
+      res.json()
+    ),
+    fetchApi(`handles/${MAIN_SUB_HANDLE_SETTINGS_HANDLE_NAME}/utxo`).then(
+      (res) => res.json()
+    ),
+    fetchApi(`handles/${MAIN_SUB_HANDLE_SETTINGS_HANDLE_NAME}/datum`, {
+      "Content-Type": "text/plain",
+    }).then((res) => res.text()),
+  ]);
+
+  if (!mainSubHandleSettingsHandleDatum) {
+    throw new Error("Main Sub Handle Settings Datum Not Found");
+  }
+
+  const mainSubHandleSettingsAssetTxInput = makeTxInput(
+    mainSubHandleSettingsHandle.utxo,
+    makeTxOutput(
+      makeAddress(mainSubHandleSettingsHandle.resolved_addresses.ada),
+      makeValue(
+        BigInt(mainSubHandleSettingsUtxo.lovelace),
+        makeAssets([
+          [
+            makeAssetClass(
+              `${LEGACY_POLICY_ID}.${mainSubHandleSettingsHandle.hex}`
+            ),
+            1n,
+          ],
+        ])
+      ),
+      makeInlineTxOutputDatum(decodeUplcData(mainSubHandleSettingsHandleDatum))
+    )
+  );
+
+  const decodedMainSubHandleSettingsResult = mayFail(() =>
+    decodeMainSubHandleSettings(mainSubHandleSettingsAssetTxInput.datum)
+  );
+  if (!decodedMainSubHandleSettingsResult.ok) {
+    return Err(decodedMainSubHandleSettingsResult.error);
+  }
+
+  return Ok({
+    mainSubHandleSettings: decodedMainSubHandleSettingsResult.data,
+    mainSubHandleSettingsAssetTxInput,
+  });
+};
+
 /**
  * Fetch Handle Price Info Data
  * @param handlePriceAssetName - The name of the handle price asset in UTF8
@@ -190,4 +254,9 @@ const fetchHandlePriceInfoData = async (
   });
 };
 
-export { fetchHandlePriceInfoData, fetchMintingData, fetchSettings };
+export {
+  fetchHandlePriceInfoData,
+  fetchMainSubHandleSettings,
+  fetchMintingData,
+  fetchSettings,
+};

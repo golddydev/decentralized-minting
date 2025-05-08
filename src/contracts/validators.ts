@@ -84,7 +84,10 @@ const getMintingDataSpendUplcProgram = (
     );
 };
 
-const getOrdersSpendUplcProgram = (legacy_policy_id: string): UplcProgramV2 => {
+const getOrdersSpendUplcProgram = (
+  new_policy_id: string,
+  legacy_policy_id: string
+): UplcProgramV2 => {
   const optimizedFoundValidator = optimizedBlueprint.validators.find(
     (validator) => validator.title == "orders.spend"
   );
@@ -96,10 +99,10 @@ const getOrdersSpendUplcProgram = (legacy_policy_id: string): UplcProgramV2 => {
     "Orders Spend Validator not found"
   );
   return decodeUplcProgramV2FromCbor(optimizedFoundValidator.compiledCode)
-    .apply(makeOrdersUplcProgramParameter(legacy_policy_id))
+    .apply(makeOrdersUplcProgramParameter(new_policy_id, legacy_policy_id))
     .withAlt(
       decodeUplcProgramV2FromCbor(unOptimizedFoundValidator.compiledCode).apply(
-        makeOrdersUplcProgramParameter(legacy_policy_id)
+        makeOrdersUplcProgramParameter(new_policy_id, legacy_policy_id)
       )
     );
 };

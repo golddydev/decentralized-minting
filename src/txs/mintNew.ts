@@ -13,14 +13,14 @@ import { Err, Ok, Result } from "ts-res";
 
 import { PREFIX_000, PREFIX_100, PREFIX_222 } from "../constants/index.js";
 import {
-  buildOrderExecuteAsNewRedeemer,
+  buildOrderExecuteRedeemer,
   decodeOrderDatum,
-  Handle,
   makeVoidData,
 } from "../contracts/index.js";
 import { getNetwork, invariant } from "../helpers/index.js";
 import { calculateHandlePrice } from "../utils/index.js";
 import { prepareNewMintTransaction } from "./prepareNewMint.js";
+import { Handle } from "./type.js";
 
 /**
  * @interface
@@ -64,7 +64,7 @@ const mintNewHandles = async (
         "utf8"
       ),
       hexName: decodedOrder.requested_handle,
-      destination: decodedOrder.destination,
+      destinationAddress: decodedOrder.destination_address,
       isLegacy: decodedOrder.is_legacy === 1n,
       isVirtual: decodedOrder.is_virtual === 1n,
       price: order.value.lovelace,
@@ -99,7 +99,7 @@ const mintNewHandles = async (
   const mintingHandlesData = [];
   for (const orderTxInput of ordersTxInputs) {
     const decodedOrder = decodeOrderDatum(orderTxInput.datum, network);
-    const { destination, is_virtual, requested_handle } = decodedOrder;
+    const { destination_address, is_virtual, requested_handle } = decodedOrder;
     const utf8Name = Buffer.from(requested_handle, "hex").toString("utf8");
 
     const refHandleAssetClass = makeAssetClass(
@@ -133,11 +133,10 @@ const mintNewHandles = async (
       1n,
       makeAssets([[virtualHandleAssetClass, 1n]])
     );
-    const destinationAddress = destination.address;
 
     mintingHandlesData.push({
       orderTxInput,
-      destinationAddress,
+      destinationAddress: destination_address,
       refHandleValue,
       userHandleValue,
       virtualHandleValue,
@@ -184,13 +183,13 @@ const mintNewHandles = async (
 
     if (isVirtual) {
       txBuilder
-        .spendUnsafe(orderTxInput, buildOrderExecuteAsNewRedeemer())
+        .spendUnsafe(orderTxInput, buildOrderExecuteRedeemer())
         // TODO:
         // Add Personalization Datum
         .payUnsafe(settingsV1.pz_script_address, virtualHandleValue);
     } else {
       txBuilder
-        .spendUnsafe(orderTxInput, buildOrderExecuteAsNewRedeemer())
+        .spendUnsafe(orderTxInput, buildOrderExecuteRedeemer())
         // TODO:
         // Add Personalization Datum
         .payUnsafe(settingsV1.pz_script_address, refHandleValue)

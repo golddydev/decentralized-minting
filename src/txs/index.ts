@@ -4,3 +4,4 @@ export * from "./order.js";
 export * from "./prepareLegacyMint.js";
 export * from "./prepareNewMint.js";
 export * from "./staking.js";
+export * from "./type.js";

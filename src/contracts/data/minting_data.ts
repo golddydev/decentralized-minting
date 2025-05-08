@@ -46,11 +46,13 @@ const buildProofData = (proof: Proof): UplcData => {
 
 const buildMintingDataMintHandlesRedeemer = (
   proofs: Proof[],
-  minter_index: bigint
+  minter_index: bigint,
+  main_sub_handle_settings_index: bigint
 ): UplcData => {
   return makeConstrData(0, [
     makeListData(proofs.map(buildProofData)),
     makeIntData(minter_index),
+    makeIntData(main_sub_handle_settings_index),
   ]);
 };
 

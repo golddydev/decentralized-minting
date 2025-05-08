@@ -20,7 +20,8 @@
     "utxo",
     "utxos",
     "blockfrost",
-    "handleable"
+    "handleable",
+    "creds"
   ],
   "ignorePaths": [
     "node_modules",

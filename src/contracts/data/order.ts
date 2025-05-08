@@ -11,24 +11,8 @@ import {
 } from "@helios-lang/uplc";
 
 import { invariant } from "../../helpers/index.js";
-import { Destination, OrderDatum } from "../types/index.js";
+import { OrderDatum } from "../types/index.js";
 import { buildAddressData, decodeAddressFromData } from "./common.js";
-
-const decodeDestinationFromData = (
-  data: UplcData,
-  network: NetworkName
-): Destination => {
-  const constrData = expectConstrData(data, 0, 1);
-  const address = decodeAddressFromData(constrData.fields[0], network);
-  return {
-    address,
-  };
-};
-
-const buildDestinationData = (destination: Destination): UplcData => {
-  const { address } = destination;
-  return makeConstrData(0, [buildAddressData(address)]);
-};
 
 const decodeOrderDatum = (
   datum: TxOutputDatum | undefined,
@@ -41,11 +25,11 @@ const decodeOrderDatum = (
   const datumData = datum.data;
   const orderConstrData = expectConstrData(datumData, 0, 5);
 
-  const owner = orderConstrData.fields[0];
+  const owner_key_hash = expectByteArrayData(orderConstrData.fields[0]).toHex();
   const requested_handle = expectByteArrayData(
     orderConstrData.fields[1]
   ).toHex();
-  const destination = decodeDestinationFromData(
+  const destination_address = decodeAddressFromData(
     orderConstrData.fields[2],
     network
   );
@@ -54,43 +38,36 @@ const decodeOrderDatum = (
   const is_virtual = expectIntData(orderConstrData.fields[4]).value;
 
   return {
-    owner,
+    owner_key_hash,
     requested_handle,
-    destination,
+    destination_address,
     is_legacy,
     is_virtual,
   };
 };
 
 const buildOrderData = (order: OrderDatum): UplcData => {
-  const { owner, destination, requested_handle } = order;
+  const { owner_key_hash, destination_address, requested_handle } = order;
   return makeConstrData(0, [
-    owner,
+    makeByteArrayData(owner_key_hash),
     makeByteArrayData(requested_handle),
-    buildDestinationData(destination),
+    buildAddressData(destination_address),
     makeIntData(order.is_legacy),
     makeIntData(order.is_virtual),
   ]);
 };
 
-const buildOrderExecuteAsNewRedeemer = (): UplcData => {
+const buildOrderExecuteRedeemer = (): UplcData => {
   return makeConstrData(0, []);
 };
 
-const buildOrderExecuteAsLegacyRedeemer = (): UplcData => {
+const buildOrderCancelRedeemer = (): UplcData => {
   return makeConstrData(1, []);
 };
 
-const buildOrderCancelRedeemer = (): UplcData => {
-  return makeConstrData(2, []);
-};
-
 export {
-  buildDestinationData,
   buildOrderCancelRedeemer,
   buildOrderData,
-  buildOrderExecuteAsLegacyRedeemer,
-  buildOrderExecuteAsNewRedeemer,
-  decodeDestinationFromData,
+  buildOrderExecuteRedeemer,
   decodeOrderDatum,
 };

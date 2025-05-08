@@ -10,6 +10,7 @@ import {
   makeMintingDataUplcProgramParameterDatum,
   makeMintProxyUplcProgramParameterDatum,
   makeMintV1UplcProgramParameterDatum,
+  makeOrdersUplcProgramParameterDatum,
 } from "../contracts/index.js";
 import { convertError, invariant } from "../helpers/index.js";
 import { fetchDeployedScript } from "../utils/contract.js";
@@ -66,6 +67,7 @@ const deploy = async (params: DeployParams): Promise<DeployData> => {
     mintV1: mintV1Config,
     mintingData: mintingDataConfig,
     orders: ordersConfig,
+    handlePolicyHash,
   } = contractsConfig;
 
   switch (contractName) {
@@ -79,6 +81,19 @@ const deploy = async (params: DeployParams): Promise<DeployData> => {
         ),
         validatorHash: mintProxyConfig.mintProxyPolicyHash.toHex(),
         policyId: mintProxyConfig.mintProxyPolicyHash.toHex(),
+      };
+    case "mint_v1.withdraw":
+      return {
+        ...extractScriptCborsFromUplcProgram(
+          mintV1Config.mintV1WithdrawUplcProgram
+        ),
+        datumCbor: bytesToHex(
+          makeMintV1UplcProgramParameterDatum(
+            mintingDataConfig.mintingDataValidatorHash.toHex()
+          ).data.toCbor()
+        ),
+        validatorHash: mintV1Config.mintV1ValidatorHash.toHex(),
+        scriptStakingAddress: mintV1Config.mintV1StakingAddress.toBech32(),
       };
     case "minting_data.spend":
       return {
@@ -94,23 +109,16 @@ const deploy = async (params: DeployParams): Promise<DeployData> => {
         validatorHash: mintingDataConfig.mintingDataValidatorHash.toHex(),
         scriptAddress: mintingDataConfig.mintingDataValidatorAddress.toBech32(),
       };
-    case "mint_v1.withdraw":
-      return {
-        ...extractScriptCborsFromUplcProgram(
-          mintV1Config.mintV1WithdrawUplcProgram
-        ),
-        datumCbor: bytesToHex(
-          makeMintV1UplcProgramParameterDatum(
-            mintingDataConfig.mintingDataValidatorHash.toHex()
-          ).data.toCbor()
-        ),
-        validatorHash: mintV1Config.mintV1ValidatorHash.toHex(),
-        scriptStakingAddress: mintV1Config.mintV1StakingAddress.toBech32(),
-      };
     case "orders.spend":
       return {
         ...extractScriptCborsFromUplcProgram(
           ordersConfig.ordersSpendUplcProgram
+        ),
+        datumCbor: bytesToHex(
+          makeOrdersUplcProgramParameterDatum(
+            handlePolicyHash.toHex(),
+            legacyPolicyId
+          ).data.toCbor()
         ),
         validatorHash: ordersConfig.ordersValidatorHash.toHex(),
         scriptAddress: ordersConfig.ordersValidatorAddress.toBech32(),

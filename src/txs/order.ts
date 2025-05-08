@@ -17,7 +17,6 @@ import {
   buildOrderCancelRedeemer,
   buildOrderData,
   decodeOrderDatum,
-  makeSignatureMultiSigScriptData,
   OrderDatum,
 } from "../contracts/index.js";
 import {
@@ -97,11 +96,9 @@ const request = async (
   );
 
   const order: OrderDatum = {
-    owner: makeSignatureMultiSigScriptData(address.spendingCredential),
+    owner_key_hash: address.spendingCredential.toHex(),
     requested_handle: Buffer.from(handle).toString("hex"),
-    destination: {
-      address,
-    },
+    destination_address: address,
     is_legacy: is_legacy ? 1n : 0n,
     is_virtual: is_virtual ? 1n : 0n,
   };
